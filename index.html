@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEGIS SECURITY CORES // EEE CYBER RESEARCH LAB</title>
+    
+    <style>
+        :root {
+            --theme-color: #00ff33; 
+            --theme-dim: rgba(0, 255, 51, 0.15);
+            --hud-bg: rgba(2, 10, 5, 0.95);
+            --hud-border: rgba(0, 255, 51, 0.25);
+            --hud-alert: #ff0055;
+            --hud-dark: #010402;
+        }
+
+        * { box-sizing: border-box; font-family: 'Courier New', monospace; }
+
+        body {
+            background-color: var(--hud-dark); color: var(--theme-color);
+            margin: 0; padding: 12px; height: 100vh; overflow: hidden;
+            position: relative; transition: color 0.3s ease;
+        }
+
+        #matrixBgCanvas {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: 1; opacity: 0.08; pointer-events: none;
+        }
+
+        .covert-zone { position: absolute; top: 5px; right: 15px; z-index: 9999; display: flex; gap: 10px; }
+        .covert-btn { background: transparent; border: 1px solid rgba(0, 255, 51, 0.05); color: rgba(0, 255, 51, 0.1); cursor: pointer; font-size: 10px; padding: 3px 6px; }
+        .covert-btn:hover { color: var(--theme-color) !important; border-color: var(--theme-color) !important; background: rgba(0, 255, 51, 0.1); }
+
+        .app-frame {
+            position: relative; z-index: 5; display: flex; flex-direction: column;
+            height: 97vh; border: 1px solid var(--hud-border); padding: 12px;
+            background: rgba(1, 5, 2, 0.75); backdrop-filter: blur(4px);
+            transition: border-color 0.3s ease;
+        }
+
+        header {
+            border-bottom: 1px solid var(--hud-border); padding-bottom: 8px;
+            display: flex; justify-content: space-between; align-items: center; 
+            background: var(--hud-bg); padding: 10px 15px; margin-bottom: 5px;
+        }
+        
+        .header-branding-box { display: flex; flex-direction: column; gap: 2px; max-width: 450px; }
+        .branding-title { font-size: 0.95rem; font-weight: bold; color: #fff; letter-spacing: 1px; text-shadow: 0 0 5px var(--theme-color); }
+        .branding-sub { font-size: 0.68rem; color: var(--theme-color); opacity: 0.8; }
+
+        .nav-tabs { display: flex; gap: 10px; }
+        .nav-tabs button {
+            background: transparent; border: 1px solid var(--hud-border); color: var(--theme-color);
+            padding: 6px 14px; cursor: pointer; font-weight: bold; font-size: 0.78rem; transition: all 0.3s;
+        }
+        .nav-tabs button.active { background: var(--theme-color); color: #000; font-weight: bold; box-shadow: 0 0 10px var(--theme-color); }
+
+        .upper-settings-bar {
+            background: rgba(0,0,0,0.4); border: 1px solid var(--hud-border);
+            padding: 8px 12px; display: flex; justify-content: space-between; gap: 15px; margin-bottom: 8px;
+        }
+        .setting-nob-item { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; }
+        .nob-toggle-switch { width: 34px; height: 16px; background: #111; border: 1px solid #333; border-radius: 8px; position: relative; cursor: pointer; transition: background 0.3s; }
+        .nob-toggle-switch::after { content: ''; position: absolute; top: 1px; left: 2px; width: 12px; height: 12px; background: #666; border-radius: 50%; transition: left 0.3s; }
+        .nob-toggle-switch.active { background: rgba(0, 255, 51, 0.2); border-color: var(--theme-color); }
+        .nob-toggle-switch.active::after { left: 18px; background: var(--theme-color); box-shadow: 0 0 5px var(--theme-color); }
+
+        .workspace { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 12px; flex-grow: 1; min-height: 0; }
+        .page-view { display: none; height: 100%; flex-direction: column; }
+        .page-view.active { display: flex; }
+
+        .panel-box { border: 1px solid var(--hud-border); display: flex; flex-direction: column; background: var(--hud-bg); position: relative; overflow: hidden; height: 100%; transition: border-color 0.3s ease; }
+        .panel-title { background: rgba(0, 255, 51, 0.05); padding: 8px 12px; font-size: 0.8rem; border-bottom: 1px solid var(--hud-border); font-weight: bold; }
+
+        /* 3D Tunnel Component Window Stage */
+        .tunnel-stage { flex-grow: 1; background: #000; display: flex; justify-content: center; align-items: center; perspective: 180px; position: relative; height: 100%; }
+        .tunnel-container { position: absolute; width: 100%; height: 100%; transform-style: preserve-3d; }
+        
+        .square-ring {
+            position: absolute; top: 50%; left: 50%; width: 140px; height: 140px; margin-top: -70px; margin-left: -70px;
+            border: 2px solid var(--theme-color); transform-style: preserve-3d; opacity: 0;
+            animation: tunnelAnimationLoop 4s linear infinite; transition: all 0.3s ease;
+        }
+        .square-ring:nth-child(1) { animation-delay: 0s; }
+        .square-ring:nth-child(2) { animation-delay: 1s; }
+        .square-ring:nth-child(3) { animation-delay: 2s; }
+        .square-ring:nth-child(4) { animation-delay: 3s; }
+
+        .t-circle .square-ring { border-radius: 50%; }
+        .t-triangle .square-ring { width: 0; height: 0; border-left: 70px solid transparent; border-right: 70px solid transparent; border-bottom: 120px solid var(--theme-color); border-top: none; background: transparent; }
+
+        .wave-container { position: absolute; top: 15px; right: 15px; display: flex; gap: 4px; align-items: flex-end; height: 35px; }
+        .wave-bar { width: 3px; background: var(--theme-color); height: 20%; transition: height 0.15s, background-color 0.3s; }
+
+        /* DIRECT INLINE AUDIT COMPREHENSIVE RESULT BOX AREA Overlay */
+        .direct-results-view {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(1, 4, 10, 0.98); padding: 15px; z-index: 60; display: none;
+            flex-direction: column; gap: 12px; overflow-y: auto;
+        }
+        .res-header-title { font-size: 1.05rem; font-weight: bold; border-bottom: 1px solid var(--theme-color); padding-bottom: 6px; letter-spacing: 1px; }
+        
+        .result-nobs-deck { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 5px; }
+        .result-mini-nob {
+            background: rgba(0,0,0,0.6); border: 1px solid currentColor;
+            padding: 8px; font-size: 0.75rem; font-weight: bold; text-align: center; cursor: pointer; transition: all 0.2s;
+        }
+        .nob-hacker { color: var(--hud-alert); }
+        .nob-files { color: #ffff00; }
+        .nob-net { color: #00f2fe; }
+        .result-mini-nob.active { background: currentColor; color: #000; font-weight: bold; box-shadow: 0 0 10px currentColor; }
+        .result-details-display { background: rgba(0,0,0,0.6); border: 1px dashed var(--hud-border); padding: 12px; font-size: 0.8rem; line-height: 1.6; flex-grow: 1; }
+
+        /* Graphical Folders Box Layout Structure */
+        .folder-grid { display: flex; gap: 15px; margin-top: 10px; }
+        .folder-box { border: 1px solid var(--theme-color); background: rgba(0, 255, 51, 0.03); width: 110px; padding: 8px; text-align: center; border-radius: 4px; }
+        .folder-icon { width: 38px; height: 28px; background: var(--theme-color); margin: 0 auto 6px auto; position: relative; border-radius: 2px 5px 2px 2px; }
+        .folder-icon::before { content: ''; position: absolute; top: -5px; left: 0; width: 15px; height: 5px; background: var(--theme-color); border-radius: 2px 2px 0 0; }
+        .folder-name { font-size: 0.65rem; color: #fff; word-break: break-all; display: block; }
+        .folder-status { font-size: 0.58rem; color: #ffff00; font-weight: bold; margin-top: 3px; display: block; }
+
+        .reset-frame-btn { background: transparent; border: 1px solid var(--theme-color); color: var(--theme-color); padding: 5px 12px; cursor: pointer; font-weight: bold; font-size: 0.75rem; width: 110px; margin-top: auto; }
+        .reset-frame-btn:hover { background: var(--theme-color); color: #000; }
+
+        /* Dialog Loaders Popup Box */
+        .hud-loader-modal {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 85%; background: rgba(0, 3, 1, 0.98); border: 2px solid var(--theme-color);
+            padding: 20px; z-index: 100; display: none; flex-direction: column; gap: 10px;
+        }
+        .progress-bar-container { display: flex; gap: 4px; width: 100%; border: 1px solid var(--hud-border); padding: 4px; background: #000; }
+        .bar-segment { flex-grow: 1; height: 16px; background: rgba(0, 255, 51, 0.03); }
+        .bar-segment.filled { background-color: var(--theme-color); box-shadow: 0 0 8px var(--theme-color); }
+
+        /* Alert Banner Modal Container Screen */
+        .alert-banner {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 85%; background: rgba(255, 0, 85, 0.95); border: 2px solid #fff; color: #fff;
+            padding: 20px; z-index: 150; text-align: center; font-size: 1.3rem; font-weight: bold; display: none;
+            animation: flash 0.4s infinite alternate;
+        }
+
+        /* Scripting Code Shell Windows Terminal Grid Box */
+        .matrix-terminal {
+            flex-grow: 1; background: rgba(0, 1, 3, 0.98); padding: 15px;
+            font-size: 0.82rem; line-height: 1.6; overflow-y: auto;
+            display: flex; flex-direction: column; justify-content: flex-end;
+            border-top: 1px solid var(--hud-border); scroll-behavior: smooth;
+        }
+        .matrix-row { margin-bottom: 2px; white-space: pre-wrap; word-break: break-all; opacity: 0; transform: translateY(3px); animation: inputRow 0.1s ease-out forwards; }
+        
+        .c-white { color: #ffffff; }
+        .c-theme { color: var(--theme-color); }
+        .c-blue { color: #0066ff; }
+        .c-yellow { color: #ffff00; }
+        .c-alert { color: var(--hud-alert); font-weight: bold; text-shadow: 0 0 3px var(--hud-alert); }
+
+        .about-us-container { padding: 20px; text-align: center; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 15px; }
+        .univ-title { font-size: 1.5rem; color: #fff; font-weight: bold; text-shadow: 0 0 10px var(--theme-color); }
+        .dept-title { font-size: 1.1rem; color: #ffff00; font-weight: bold; }
+        .team-members-box { border: 1px dashed var(--hud-border); background: rgba(0,0,0,0.4); padding: 20px; width: 90%; max-width: 520px; text-align: left; line-height: 1.8; }
+
+        .app-diagnostics-footer {
+            margin-top: 10px; border: 1px solid var(--hud-border); background: var(--hud-bg);
+            padding: 10px 15px; display: flex; justify-content: space-between; font-size: 0.75rem; line-height: 1.4;
+        }
+        .diag-column { width: 48%; }
+        .diag-column h4 { margin: 0 0 5px 0; color: #fff; font-size: 0.8rem; letter-spacing: 1px; }
+
+        @keyframes tunnelAnimationLoop {
+            0% { transform: translateZ(-500px) rotate(0deg); opacity: 0; }
+            15% { opacity: 1; }
+            85% { opacity: 1; }
+            100% { transform: translateZ(150px) rotate(90deg); opacity: 0; }
+        }
+        @keyframes flash { from { background: rgba(255, 0, 85, 0.95); } to { background: rgba(80, 0, 25, 0.95); } }
+        @keyframes inputRow { to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <canvas id="matrixBgCanvas"></canvas>
+
+    <div class="covert-zone">
+        <button onclick="executePythonDefenseSuite(1)" class="covert-btn">A1</button>
+        <button onclick="executePythonDefenseSuite(2)" class="covert-btn">A2</button>
+        <button onclick="executePythonDefenseSuite(3)" class="covert-btn">A3</button>
+    </div>
+
+    <div class="app-frame" id="mainAppFrame">
+        
+        <header id="mainHeader">
+            <div class="header-branding-box">
+                <div class="branding-title">DEVELOPED BY: PATHON & IBRAHIM</div>
+                <div class="branding-sub">💥 EEE DEPARTMENT // KHULNA KHAN BAHADUR AHSANULLAH UNIVERSITY</div>
+            </div>
+
+            <div class="nav-tabs">
+                <button onclick="routeSuiteView('hud')" id="tab-hud" class="active">> SYSTEM HUD</button>
+                <button onclick="routeSuiteView('about')" id="tab-about">> ABOUT SYSTEM</button>
+            </div>
+            
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button onclick="triggerDeepPcScan()" id="scanBtn" style="background:transparent; border:1px solid var(--theme-color); color:var(--theme-color); padding:5px 12px; cursor:pointer; font-weight:bold; font-size: 0.75rem;">⚡ RUN DEEP PC DIAGNOSTIC SCAN</button>
+                <button onclick="window.location.reload();" style="background:transparent; border:1px solid #ff0055; color:#ff0055; padding:5px 12px; cursor:pointer; font-weight:bold; font-size: 0.75rem; box-shadow: 0 0 5px rgba(255,0,85,0.3);">🔄 HARD RESET CORE</button>
+            </div>
+            
+            <div style="font-size: 1.4rem; font-weight: bold; color: #fff;" id="timerClock">00:00:00</div>
+        </header>
+
+        <section class="upper-settings-bar">
+            <div class="setting-nob-item"><span>[+] AI HEURISTICS</span><div class="nob-toggle-switch active" onclick="toggleUpperNob('AI Heuristics Engine', this)"></div></div>
+            <div class="setting-nob-item"><span>[+] PORT 502 SHIELD</span><div class="nob-toggle-switch active" onclick="toggleUpperNob('Modbus Port Guard', this)"></div></div>
+            <div class="setting-nob-item"><span>[+] HONEYPOT VERIFIER</span><div class="nob-toggle-switch" onclick="toggleUpperNob('Sandbox Honeypot', this)"></div></div>
+            <div class="setting-nob-item"><span>[+] ZERO-TRUST MONITOR</span><div class="nob-toggle-switch" onclick="toggleUpperNob('Zero-Trust Core', this)"></div></div>
+            <div class="setting-nob-item"><span>[+] BLOCKCHAIN RESTORE</span><div class="nob-toggle-switch active" onclick="toggleUpperNob('Ledger Sync', this)"></div></div>
+        </section>
+
+        <div class="workspace">
+            
+            <div class="panel-box">
+                <div class="panel-title" id="moduleTitle">📡 AEGIS SECURITY INTERACTIVE RESPONSE ENVIRONMENT</div>
+                
+                <div id="page-hud" class="page-view active" style="position:relative; height:100%;">
+                    
+                    <div class="direct-results-view" id="inlineResultsPanel">
+                        <div class="res-header-title" id="resHeaderTitle">🛡️ MITIGATION INCIDENT LOGS SUMMARY</div>
+                        
+                        <div class="result-nobs-deck" id="nobsDeckFrame">
+                            </div>
+                        
+                        <div class="result-details-display" id="detailsTextBox"></div>
+                        <button class="reset-frame-btn" onclick="clearResultsView()">> RESET CORES</button>
+                    </div>
+
+                    <div class="alert-banner" id="redAlertScreen">
+                        ⚠️ CRITICAL INTRUSION: ILLEGAL EXPLOIT SIGNATURE DETECTED! ⚠️
+                    </div>
+
+                    <div class="hud-loader-modal" id="hudStatusLoader">
+                        <div style="font-weight:bold; font-size:1.1rem; color:var(--hud-alert); text-align:center; letter-spacing:1px; text-shadow:0 0 5px var(--hud-alert);" id="loaderMainText">
+                            🚨 CRITICAL DANGER DETECTED // SYSTEM EXPLOIT INBOUND
+                        </div>
+                        <div class="progress-bar-container" id="progressBarBox"></div>
+                    </div>
+
+                    <div class="tunnel-stage" id="tunnelStageFrame">
+                        <div class="wave-container">
+                            <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                            <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                        </div>
+                        <div class="tunnel-container" id="coreTunnelContainer">
+                            <div class="square-ring"></div><div class="square-ring"></div>
+                            <div class="square-ring"></div><div class="square-ring"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="page-about" class="page-view" style="background:#000;">
+                    <div class="about-us-container">
+                        <div class="univ-title">KHULNA KHAN BAHADUR AHSANULLAH UNIVERSITY</div>
+                        <div class="dept-title">DEPARTMENT OF ELECTRICAL AND ELECTRONIC ENGINEERING (EEE)</div>
+                        <div class="team-members-box">
+                            <strong>PROJECT DEVELOPERS TIMELINE:</strong><br>
+                            • Lead Research / Code Architect: <span style="color:#fff">Pathon</span><br>
+                            • Systems Strategy / Cyber Specialist: <span style="color:#fff">Ibrahim</span><br><br>
+                            <strong>PROJECT THEME:</strong> Autonomous AI-Powered Cyber Warfare Mitigation Matrix Suite for National Grid Infrastructure Protection Layer.
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="panel-box">
+                <div class="panel-title">📟 ROOT@AEGIS-CORE:~ (REAL-TIME PYTHON SCRIPT EXECUTOR RUN)</div>
+                <div class="matrix-terminal" id="terminalStream"></div>
+            </div>
+
+        </div>
+
+        <footer class="app-diagnostics-footer">
+            <div class="diag-column">
+                <h4>🛠️ APPLICATION DEVELOPMENT BRIEF</h4>
+                Architecture Core: <span style="color:#fff">SOAR Automated Script Matrix Model</span><br>
+                UI Engine: <span style="color:#00f2fe">Vanilla CSS 3D Perspective Architecture Engine</span>
+            </div>
+            <div class="diag-column" style="border-left: 1px solid var(--hud-border); padding-left: 20px;">
+                <h4>🖥️ HOST HARDWARE ENVIRONMENTAL TELEMETRY</h4>
+                Server OS Node: <span style="color:#fff"><?php echo php_uname('s'); ?> ARCH</span><br>
+                Web Platform: <span style="color:#00ff33">Apache Core XAMPP Stack v3</span>
+            </div>
+        </footer>
+
+    </div>
+
+    <script>
+        const canvas = document.getElementById('matrixBgCanvas'); const ctx = canvas.getContext('2d');
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; } resize();
+        const alphabet = '0123456789ABCDEF//'.split(''); const fontSize = 14; const columns = canvas.width / fontSize; const drops = Array(Math.floor(columns)).fill(1);
+        function drawRain() { ctx.fillStyle = 'rgba(1, 4, 10, 0.08)'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = 'rgba(0, 255, 51, 0.12)'; ctx.font = fontSize + 'px monospace'; for (let i = 0; i < drops.length; i++) { const text = alphabet[Math.floor(Math.random() * alphabet.length)]; ctx.fillText(text, i * fontSize, drops[i] * fontSize); if (drops[i] * fontSize > canvas.height && Math.random() > 0.985) drops[i] = 0; drops[i]++; } } setInterval(drawRain, 35);
+
+        const term = document.getElementById('terminalStream');
+        const alertScreen = document.getElementById('redAlertScreen');
+        const loaderModal = document.getElementById('hudStatusLoader');
+        const progressBarBox = document.getElementById('progressBarBox');
+        const inlineResultsPanel = document.getElementById('inlineResultsPanel');
+        const detailsTextBox = document.getElementById('detailsTextBox');
+        const waveBars = document.querySelectorAll('.wave-bar');
+        const tunnelFrame = document.getElementById('tunnelStageFrame');
+        const tunnelContainer = document.getElementById('coreTunnelContainer');
+        const nobsDeck = document.getElementById('nobsDeckFrame');
+        let operationLock = false;
+        let scriptIntervalTracker = null;
+
+        const totalSegments = 14;
+        for(let i=0; i<totalSegments; i++) { let s = document.createElement('div'); s.className = 'bar-segment'; progressBarBox.appendChild(s); }
+        const segments = document.querySelectorAll('.bar-segment');
+
+        function printRow(text, colorClass = 'c-theme') {
+            let div = document.createElement('div'); div.className = `matrix-row ${colorClass}`; div.innerText = text;
+            term.appendChild(div); term.scrollTop = term.scrollHeight;
+            if(term.children.length > 55) term.removeChild(term.firstChild);
+        }
+
+        function routeSuiteView(pageId) {
+            document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-tabs button').forEach(b => b.classList.remove('active'));
+            document.getElementById(`page-${pageId}`).classList.add('active');
+            document.getElementById(`tab-${pageId}`).classList.add('active');
+        }
+
+        function toggleUpperNob(name, element) {
+            element.classList.toggle('active');
+            if(element.classList.contains('active')) {
+                printRow(`>>> python scan_agent.py --module=${name.toLowerCase().replace(' ', '_')}`, 'c-white');
+            }
+        }
+
+        function triggerBaselinePythonLogs() {
+            if(operationLock) return; 
+            let lines = [
+                "import socket\n>>> s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)",
+                ">>> s.connect(('127.0.0.1', 502))\n[OK] SCADA infrastructure active monitoring loop established.",
+                "[PROTECTION ACTIVE] Monitoring active state infrastructure nodes... Status: Safe."
+            ];
+            printRow(lines[Math.floor(Math.random()*lines.length)], 'c-blue');
+            let nextTick = Math.random() > 0.85 ? Math.floor(Math.random() * 1000) + 400 : Math.floor(Math.random() * 120) + 40;
+            setTimeout(triggerBaselinePythonLogs, nextTick);
+        }
+        setTimeout(triggerBaselinePythonLogs, 400);
+
+        setInterval(() => { waveBars.forEach(b => { b.style.height = Math.floor(Math.random() * 80 + 20) + '%'; }); }, 180);
+
+        function fillLoaderProgress(duration) {
+            segments.forEach(s => s.classList.remove('filled'));
+            let step = duration / totalSegments; let cur = 0;
+            const seq = setInterval(() => { if(cur < totalSegments) { segments[cur].classList.add('filled'); cur++; } else { clearInterval(seq); } }, step);
+        }
+
+        // Diagnostic Stores Box
+        const diagContentStore = {
+            virus: `<strong>🔴 CRITICAL VIRUS DETECTIONS SUMMARY:</strong><br><br>
+                    • Malware Threat Level: <span class="c-alert">HIGH DANGER DETECTED</span><br>
+                    • Matched Exploit Hook Target: Backdoor Remote Access Trojan (RAT)<br><br>
+                    <button id="virusShredBtn" onclick="shredVirusFiles()" style="background:var(--hud-alert); border:1px solid #fff; color:#fff; padding:8px 16px; font-weight:bold; cursor:pointer; box-shadow: 0 0 15px var(--hud-alert);">
+                        💀 SHRED DANGEROUS VIRUS FILES
+                    </button>`,
+            cache: `<strong>🟡 LOCALIZED SYSTEM CACHE DATA BUFFER STATUS:</strong><br><br>
+                    • Corrupted Memory Pointers Dumped: <span class="c-yellow">1,422 Entries</span><br>
+                    • Temp Directory Buffers Size Checked: <span class="c-white">412.5 MB Unused Logs</span><br><br>
+                    Temporary partition dumps verified clean with core registry variables secured.`,
+            privacy: `<strong>🟢 PERIMETER PRIVACY CONTROL MATRIX REPORT:</strong><br><br>
+                      • Connected SCADA Peripheral Sockets Security: <span class="c-green">100% ENFORCED</span><br>
+                      • Dynamic Access Authorization Token Checks: <span class="c-green">PASS</span><br><br>
+                      Zero-Trust perimeter validation engine running continuously with zero exfiltration vectors captured.`
+        };
+
+        function switchDiagTab(tabId, btnElement) {
+            document.querySelectorAll('.result-mini-nob').forEach(b => b.classList.remove('active'));
+            btnElement.classList.add('active');
+            detailsTextBox.innerHTML = diagContentStore[tabId];
+        }
+
+        // =============================================
+        // 7-SECONDS DEEP COMPUTER DIAGNOSTICS SCAN ENGINE
+        // =============================================
+        function triggerDeepPcScan() {
+            if(operationLock) return; operationLock = true;
+            routeSuiteView('hud');
+            inlineResultsPanel.style.display = 'none';
+            tunnelContainer.style.display = 'none'; // Instant removal of 3D Tunnel
+            
+            const oldVBtn = document.getElementById('virusShredBtn'); if(oldVBtn) oldVBtn.remove();
+            const oldSBtn = document.getElementById('safeStatusPanel'); if(oldSBtn) oldSBtn.remove();
+            
+            document.getElementById('scanBtn').innerText = "🚨 SCANNING CORES...";
+            document.documentElement.style.setProperty('--theme-color', '#00f2fe'); 
+            document.documentElement.style.setProperty('--theme-dim', 'rgba(0, 242, 254, 0.15)');
+            
+            document.getElementById('loaderMainText').innerHTML = "⚙️ RUNNING COMPREHENSIVE PC SYSTEM DIAGNOSTIC SCAN...";
+            document.getElementById('loaderMainText').style.color = "#00f2fe";
+            document.getElementById('loaderMainText').style.textShadow = "0 0 5px #00f2fe";
+            
+            loaderModal.style.display = 'flex';
+            fillLoaderProgress(7000); 
+
+            printRow(">>> import os, sys, psutil, hashlib, socket\n>>> print('[DIAG] Commencing multi-threaded PC scanning agent...')", 'c-white');
+
+            let scanElapsed = 0;
+            function executeScanLogTick() {
+                if(!operationLock) return;
+                scanElapsed += 100;
+                let nextLogDelay = 45; 
+                
+                let logsPool = [
+                    `>>> hashlib.sha256(open(f'/sys/bin/node_{scanElapsed}', 'rb').read()).hexdigest()`,
+                    `[PARSING] Verifying hash block signature for registry_hook_${scanElapsed}.dll... [PASS]`,
+                    `>>> socket.gethostbyname_ex('grid_PLC_sub_${scanElapsed % 5}.local')`,
+                    `[AUDIT] Scanning file pathway structures context inside /root/user/documents/`
+                ];
+
+                if (scanElapsed >= 2000 && scanElapsed <= 5000) {
+                    nextLogDelay = 900; 
+                    printRow(">>> psutil.process_iter(attrs=['pid', 'name', 'username']) # Auditing running background hooks...", 'c-yellow');
+                    printRow("[SUSPICIOUS] Investigating memory allocation block at address: 0x7FFF9E00", 'c-white');
+                } else {
+                    printRow(logsPool[Math.floor(Math.random()*logsPool.length)], Math.random() > 0.45 ? 'c-white' : 'c-theme');
+                }
+
+                if (scanElapsed < 7000) {
+                    setTimeout(executeScanLogTick, nextLogDelay);
+                }
+            }
+            setTimeout(executeScanLogTick, 50);
+
+            setTimeout(() => {
+                loaderModal.style.display = 'none';
+                printRow("⚠️ ASSESSMENT ALERT: Malicious trojan frame signature found inside /temp/Backdoor.Trojan!", 'c-alert');
+                
+                document.getElementById('resHeaderTitle').innerText = "🖥️ DEEP PC DIAGNOSTIC ASSESSMENT MATRIX";
+                
+                nobsDeck.innerHTML = `
+                    <button class="result-mini-nob nob-hacker active" onclick="switchDiagTab('virus', this)">[NOB] VIRUS DETECT</button>
+                    <button class="result-mini-nob nob-files" onclick="switchDiagTab('cache', this)">[NOB] SYS CACHE</button>
+                    <button class="result-mini-nob nob-net" onclick="switchDiagTab('privacy', this)">[NOB] PRIVACY OPS</button>
+                `;
+                
+                detailsTextBox.innerHTML = diagContentStore['virus'];
+                inlineResultsPanel.style.display = 'flex'; 
+            }, 7000); 
+        }
+
+        function shredVirusFiles() {
+            printRow(">>> import os, shutil\n>>> os.remove('/temp/Backdoor.Trojan') # Wiping signature hash from drive", 'c-white');
+            printRow(">>> sys.stdout.write('[WIPE] Purging trojan memory strings and allocations buffers...\\n')", 'c-yellow');
+            
+            inlineResultsPanel.style.display = 'none';
+            tunnelContainer.style.display = 'block';
+            tunnelFrame.className = "tunnel-stage t-triangle"; 
+            
+            let shredElapsed = 0;
+            let deletionLogInterval = setInterval(() => {
+                shredElapsed++;
+                printRow(">>> os.shred_sector_partition_map_index(sector=" + shredElapsed + ")", 'c-alert');
+            }, 40);
+
+            setTimeout(() => {
+                clearInterval(deletionLogInterval);
+                tunnelFrame.className = "tunnel-stage";
+                tunnelContainer.style.display = 'none';
+                inlineResultsPanel.style.display = 'flex';
+                
+                detailsTextBox.innerHTML = `
+                    <div id="safeStatusPanel" style="text-align:center; padding:15px; background:rgba(0,15,5,0.4); border:1px solid #00ff33; border-radius:4px;">
+                        <h3 style="color:#fff; margin:0 0 10px 0;">STATUS: 100% SECURE & PROTECTED</h3>
+                        <p style="font-size:0.75rem; color:#00ff33; margin-bottom:12px;">Backdoor trojan files purged with MBR sector partition maps clean.</p>
+                        <button class="reset-frame-btn" onclick="rearmSecurityStandby()" style="width:140px;">[RE-ARM SECURITY]</button>
+                    </div>
+                `;
+            }, 2500);
+        }
+
+        function rearmSecurityStandby() {
+            document.documentElement.style.setProperty('--theme-color', '#00ff33'); 
+            document.documentElement.style.setProperty('--theme-dim', 'rgba(0, 255, 51, 0.15)');
+            clearResultsView();
+            operationLock = false;
+        }
+
+        const attackContentStore = {
+            hacker: `<strong>🔴 INTRUDER NETWORK RECON ATTACK SOURCE REPORT:</strong><br><br>
+                     • Target Proxies Host Server: <span class="c-white">185.220.101.4</span><br>
+                     • Geocentric Location Coordinates: Moscow, RU (55.75° N, 37.61° E)<br>
+                     • Defensive Shield Phase: <span class="c-alert">STANDBY VECTOR LOCKED</span><br><br>
+                     <button id="hackerOffensiveBtn" onclick="launchHackerShredOffensive()" style="background:var(--hud-alert); border:1px solid #fff; color:#fff; padding:6px 12px; font-weight:bold; cursor:pointer; font-size:0.75rem; box-shadow: 0 0 10px var(--hud-alert);">
+                         💥 LAUNCH OFFENSIVE COUNTER-STRIKE (20s SHRED)
+                     </button>`,
+            files: `<strong>🟡 CRYPTOGRAPHIC PERIMETER VAULT FILE LOCK MATRIX:</strong><br><br>
+                    The targeted data directories being copied by the threat vector have been successfully encrypted and sealed into separate storage pipelines via AES-256 ciphers:<br>
+                    
+                    <div class="folder-grid">
+                        <div class="folder-box"><div class="folder-icon"></div><span class="folder-name">volt_config.db</span><span class="folder-status">[SECURED]</span></div>
+                        <div class="folder-box"><div class="folder-icon"></div><span class="folder-name">auth.key</span><span class="folder-status">[ENCRYPTED]</span></div>
+                        <div class="folder-box"><div class="folder-icon"></div><span class="folder-name">telemetry.dat</span><span class="folder-status">[AIR-GAPPED]</span></div>
+                    </div>`,
+            network: `<strong>🟢 SCADA GRID CONNECTIVITY INFRASTRUCTURE TELEMETRY:</strong><br><br>
+                      • Trans-Grid Connection Nodes Synchronization: <span class="c-green">RE-ARMED COMPLETED</span><br>
+                      All Modbus database parameters rolled back successfully to last trusted blockchain block snapshot snapshot with 0 data loss.`
+        };
+
+        function invokeDetailsTab(tabId, btnElement) {
+            document.querySelectorAll('.result-mini-nob').forEach(b => b.classList.remove('active'));
+            btnElement.classList.add('active');
+            detailsTextBox.innerHTML = attackContentStore[tabId];
+            
+            let currentHexColor = window.getComputedStyle(document.body).getPropertyValue('--theme-color').trim();
+            document.querySelectorAll('.folder-box').forEach(box => { box.style.borderColor = currentHexColor; box.querySelector('.folder-icon').style.backgroundColor = currentHexColor; });
+        }
+
+        function clearResultsView() {
+            inlineResultsPanel.style.display = 'none';
+            tunnelContainer.style.display = 'block';
+            printRow("SYSTEM: Master shield reset complete. Resuming trans-grid telemetry loops.", 'c-theme');
+        }
+
+        const attackProfiles = {
+            1: { color: '#00ff33', alertText: "Ransomware.CryptoLock.v4", shapeClass: "" },
+            2: { color: '#ffff00', alertText: "SCADA.Modbus.BufferOverflow", shapeClass: "t-circle" },
+            3: { color: '#00f2fe', alertText: "Zero-Day.DDoS.Botnet.Flood", shapeClass: "t-triangle" }
+        };
+
+        // ========================================================
+        // ENHANCED PIPELINE: CRITICAL DANGER TEXT OVERLAY FIX
+        // ========================================================
+        function executePythonDefenseSuite(id) {
+            if(operationLock) return; operationLock = true;
+            let config = attackProfiles[id];
+            
+            document.documentElement.style.setProperty('--theme-color', config.color);
+            document.documentElement.style.setProperty('--theme-dim', config.color + '22');
+            tunnelFrame.className = "tunnel-stage " + config.shapeClass;
+            
+            routeSuiteView('hud');
+            inlineResultsPanel.style.display = 'none'; 
+            
+            let elapsed = 0;
+            const clock = document.getElementById('timerClock'); clock.style.color = 'var(--hud-alert)';
+            
+            // FIX 1: Instant removal of 3D Rings & Trigger Reconfigured Danger Loader Dialogue Immediately
+            tunnelContainer.style.display = 'none'; 
+            document.getElementById('loaderMainText').innerHTML = "🚨 CRITICAL DANGER DETECTED // SYSTEM EXPLOIT INBOUND";
+            document.getElementById('loaderMainText').style.color = "var(--hud-alert)";
+            document.getElementById('loaderMainText').style.textShadow = "0 0 5px var(--hud-alert)";
+            loaderModal.style.display = 'flex';
+            fillLoaderProgress(3000);
+
+            printRow("sys.stderr.write('🚨 [CRITICAL DANGER DETECTED] MALICIOUS PERIMETER SHIELD BREACH CAPTURED!\\n')", 'c-alert');
+
+            function startScriptInterval(delay) {
+                if(scriptIntervalTracker) clearInterval(scriptIntervalTracker);
+                scriptIntervalTracker = setInterval(() => {
+                    let scripts = [
+                        "import os; print(f'ALERT: Threat frame matched vector signature {os.urandom(2).hex().toUpperCase()}')",
+                        "socket.error: [Id-104] Active data packet flood packet intercept bound active",
+                        "sys.exit(1) # Closing buffer stream gateway links to logically isolate sub-grid routers"
+                    ];
+                    printRow(scripts[Math.floor(Math.random()*scripts.length)], Math.random() > 0.4 ? 'c-white' : 'c-alert');
+                }, delay);
+            }
+            startScriptInterval(35); // Initial rapid speed block scroll
+
+            const timelineController = setInterval(() => {
+                elapsed++;
+                clock.innerText = `00:00:${elapsed < 10 ? '0' + elapsed : elapsed}`;
+
+                if(elapsed === 3) {
+                    // Update loader text string for next phase logic rules seamlessly
+                    document.getElementById('loaderMainText').innerHTML = "🔒 EXECUTING PYTHON AES-256 VAULT FILE ENCRYPTION LOCK...";
+                    document.getElementById('loaderMainText').style.color = "var(--theme-color)";
+                    document.getElementById('loaderMainText').style.textShadow = "none";
+                    fillLoaderProgress(4000);
+                }
+                
+                if(elapsed === 5) {
+                    startScriptInterval(900); // Trigger deep analysis pause speed (Stop & Go)
+                    printRow(">>> from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes", 'c-white');
+                    printRow(">>> print('[ENGINE] Securing localized SCADA directories via exclusive memory locks...')", 'var(--theme-color)');
+                }
+                if(elapsed === 8) {
+                    document.getElementById('loaderMainText').innerHTML = "🛰️ TRIGGERING BLOCKCHAIN IMMUTABLE SNAPSHOT ROLLBACK...";
+                    fillLoaderProgress(3000);
+                }
+                if(elapsed === 11) {
+                    printRow("✔ SUCCESS: Immutable rollback verification block matched successfully.", 'c-green');
+                }
+                if(elapsed === 12) {
+                    document.getElementById('loaderMainText').innerHTML = "📡 GEOLOCATING TARGET COORDINATE HOST INFRASTRUCTURE...";
+                    fillLoaderProgress(3000);
+                }
+                if(elapsed === 14) {
+                    printRow("🎯 HOST PARAMETERS LOCKED: Remote control footprint pinned -> Moscow, RU (185.220.101.4)", 'c-alert');
+                }
+
+                if(elapsed === 15) {
+                    document.getElementById('loaderMainText').innerHTML = "💥 DEPLOYING COUNTER CRITICAL DATA-SHREDDER MALWARE...";
+                    fillLoaderProgress(4000);
+                    startScriptInterval(30); // RE-TRIGGER EXTREME BURST RAPID SCROLL MODE
+                }
+                if(elapsed === 18) {
+                    printRow("✔ ACTIVE COUNTER WARFARE SUCCESSFUL: Attacker root directory partitions destroyed.", 'c-green');
+                }
+
+                if(elapsed >= 20) {
+                    clearInterval(timelineController);
+                    clearInterval(scriptIntervalTracker); 
+                    loaderModal.style.display = 'none'; clock.style.color = 'var(--theme-color)';
+                    
+                    tunnelContainer.style.display = 'none'; 
+                    document.getElementById('resHeaderTitle').innerText = config.alertText.toUpperCase() + " OPERATION PURGE LEDGER";
+                    
+                    nobsDeck.innerHTML = `
+                        <button class="result-mini-nob nob-hacker active" onclick="invokeDetailsTab('hacker', this)">[NOB] HACKER INTEL</button>
+                        <button class="result-mini-nob nob-files" onclick="invokeDetailsTab('files', this)">[NOB] CRYPTO LOCK</button>
+                        <button class="result-mini-nob nob-net" onclick="invokeDetailsTab('network', this)">[NOB] NODE STATE</button>
+                    `;
+                    
+                    detailsTextBox.innerHTML = attackContentStore['hacker'];
+                    inlineResultsPanel.style.display = 'flex'; 
+                    
+                    printRow("[FINALIZE] SUITE PROTOCOL SHIELD MITIGATION CYCLE CONCLUDED. PERIMETER ARMED.", 'c-green');
+                    operationLock = false;
+                }
+            }, 1000);
+        }
+
+        function launchHackerShredOffensive() {
+            const hBtn = document.getElementById('hackerOffensiveBtn');
+            hBtn.disabled = true; hBtn.innerText = "OFFENSIVE ACTIVE...";
+            tunnelFrame.className = "tunnel-stage t-triangle"; 
+            inlineResultsPanel.style.display = 'none';
+            tunnelContainer.style.display = 'block';
+            
+            printRow(">>> import socket, os, payload_builder\n>>> strike_vector = payload_builder.compile_mbr_shredder()", 'c-white');
+
+            let countdown = 20; 
+            const offensiveInterval = setInterval(() => {
+                countdown--;
+                printRow(">>> s.sendto(strike_vector, ('185.220.101.4', 80)) # SHRED_SECTOR_MAP_" + countdown, 'c-alert');
+
+                if(countdown <= 0) {
+                    clearInterval(offensiveInterval);
+                    tunnelFrame.className = "tunnel-stage"; 
+                    tunnelContainer.style.display = 'none';
+                    inlineResultsPanel.style.display = 'flex';
+                    printRow("💀 WARFARE COMPLETE: Host server partitions encrypted and destroyed.", 'c-green');
+                    detailsTextBox.innerHTML = `<span style="color:#ff0055; font-weight:bold;">[💀 HACKER STATUS: WIPED OUT SUCCESFULLY WITH ZERO DATA RETAINED IN 20 SECONDS]</span>`;
+                }
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
